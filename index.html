@@ -270,18 +270,33 @@
       ));
     }
 
-    async function api(method, url, body) {
-      const opt = { method, headers: { 'Content-Type': 'application/json' } };
-      if (body) opt.body = JSON.stringify(body);
-      const res = await fetch(url, opt);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '通信エラー');
-      return data;
+    // ===== データ保存（ブラウザ内の localStorage に保存）=====
+    const STORAGE_KEY = 'secretary-app-data-v1';
+
+    function loadState() {
+      try {
+        const d = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        return {
+          memos: Array.isArray(d.memos) ? d.memos : [],
+          tasks: Array.isArray(d.tasks) ? d.tasks : [],
+          reflections: Array.isArray(d.reflections) ? d.reflections : [],
+        };
+      } catch (e) {
+        return { memos: [], tasks: [], reflections: [] };
+      }
     }
 
-    async function refresh() {
-      const state = await api('GET', '/api/state');
-      render(state);
+    function saveState(state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function newId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      return Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+    }
+
+    function refresh() {
+      render(loadState());
     }
 
     // "2026-W30" を "2026年 第30週" に整形
@@ -364,31 +379,50 @@
       }
     }
 
-    async function addMemo() {
+    function addMemo() {
       const title = document.getElementById('memo-title');
       const content = document.getElementById('memo-content');
-      if (!title.value.trim() && !content.value.trim()) {
+      const t = title.value.trim();
+      const c = content.value.trim();
+      if (!t && !c) {
         alert('タイトルか本文を入力してください');
         return;
       }
-      await api('POST', '/api/memos', { title: title.value, content: content.value });
+      const state = loadState();
+      state.memos.unshift({ id: newId(), title: t, content: c, createdAt: new Date().toISOString() });
+      saveState(state);
       title.value = '';
       content.value = '';
       refresh();
     }
 
-    async function deleteMemo(id) {
+    function deleteMemo(id) {
       if (!confirm('このメモを削除しますか？')) return;
-      await api('DELETE', '/api/memos/' + id);
+      const state = loadState();
+      state.memos = state.memos.filter((m) => m.id !== id);
+      saveState(state);
       refresh();
     }
 
-    async function saveReflection() {
+    function saveReflection() {
       const weekEl = document.getElementById('refl-week');
       const commentEl = document.getElementById('refl-comment');
-      if (!weekEl.value) { alert('対象の週を選択してください'); return; }
-      if (!commentEl.value.trim()) { alert('振り返りコメントを入力してください'); return; }
-      await api('POST', '/api/reflections', { week: weekEl.value, comment: commentEl.value });
+      const week = weekEl.value;
+      const comment = commentEl.value.trim();
+      if (!week) { alert('対象の週を選択してください'); return; }
+      if (!comment) { alert('振り返りコメントを入力してください'); return; }
+      const state = loadState();
+      const now = new Date().toISOString();
+      const existing = state.reflections.find((r) => r.week === week);
+      if (existing) {
+        existing.comment = comment;
+        existing.updatedAt = now;
+      } else {
+        state.reflections.push({ id: newId(), week, comment, createdAt: now, updatedAt: now });
+      }
+      // 週の新しい順に並べ替え
+      state.reflections.sort((a, b) => (a.week < b.week ? 1 : a.week > b.week ? -1 : 0));
+      saveState(state);
       commentEl.value = '';
       refresh();
     }
@@ -398,9 +432,11 @@
       sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    async function deleteReflection(id) {
+    function deleteReflection(id) {
       if (!confirm('この振り返りを削除しますか？')) return;
-      await api('DELETE', '/api/reflections/' + id);
+      const state = loadState();
+      state.reflections = state.reflections.filter((r) => r.id !== id);
+      saveState(state);
       refresh();
     }
 
@@ -417,28 +453,36 @@
       return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
     }
 
-    async function addTask() {
+    function addTask() {
       const input = document.getElementById('task-text');
-      if (!input.value.trim()) return;
-      await api('POST', '/api/tasks', { text: input.value });
+      const text = input.value.trim();
+      if (!text) return;
+      const state = loadState();
+      state.tasks.unshift({ id: newId(), text, done: false, createdAt: new Date().toISOString() });
+      saveState(state);
       input.value = '';
       refresh();
     }
 
-    async function toggleTask(id, done) {
-      await api('PATCH', '/api/tasks/' + id, { done });
+    function toggleTask(id, done) {
+      const state = loadState();
+      const task = state.tasks.find((t) => t.id === id);
+      if (task) task.done = done;
+      saveState(state);
       refresh();
     }
 
-    async function deleteTask(id) {
+    function deleteTask(id) {
       if (!confirm('このタスクを削除しますか？')) { refresh(); return; }
-      await api('DELETE', '/api/tasks/' + id);
+      const state = loadState();
+      state.tasks = state.tasks.filter((t) => t.id !== id);
+      saveState(state);
       refresh();
     }
 
-    // 初回読み込み：週入力を今週で初期化してからデータ取得
+    // 初回読み込み：週入力を今週で初期化してから表示
     document.getElementById('refl-week').value = currentIsoWeek();
-    refresh().catch((e) => alert(e.message));
+    refresh();
   </script>
 </body>
 </html>
