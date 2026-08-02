@@ -86,6 +86,30 @@
     }
     .latest-refl .lr-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
     .latest-refl .lr-empty { color: var(--muted); }
+    /* 振り返りパネルの直後にタスクパネルが続くので余白を詰める */
+    .latest-refl { margin-bottom: 10px; }
+
+    /* 最新の未完了タスク（1行コンパクト表示） */
+    .latest-task {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      background: #fff4e6;
+      border: 1px solid #ffe0b8;
+      border-radius: 10px;
+      padding: 8px 14px;
+      margin-bottom: 28px;
+      font-size: 13px;
+    }
+    .latest-task .lt-head { font-weight: 700; color: #c9781a; white-space: nowrap; }
+    .latest-task .lt-body { display: contents; }
+    .latest-task .lt-text {
+      flex: 1; min-width: 120px; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .latest-task .lt-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .latest-task .lt-empty { color: var(--muted); }
 
     /* 振り返り入力フォーム */
     .refl-week { display: block; margin-bottom: 10px; }
@@ -204,6 +228,12 @@
     <div class="latest-refl" id="latest-refl" onclick="goToReflList()" title="クリックで振り返り一覧へ移動">
       <span class="lr-head">📌 最新の振り返り</span>
       <span class="lr-body" id="latest-refl-body"><span class="lr-empty">まだ振り返りがありません。</span></span>
+    </div>
+
+    <!-- 最新の未完了タスク -->
+    <div class="latest-task" id="latest-task">
+      <span class="lt-head">🔔 最新の未完了タスク</span>
+      <span class="lt-body" id="latest-task-body"><span class="lt-empty">未完了のタスクはありません。</span></span>
     </div>
 
     <!-- メモ追加 -->
@@ -326,6 +356,17 @@
           <span class="lr-week">${esc(fmtWeek(r.week))}</span>
           <span class="lr-comment" title="${esc(r.comment)}">${esc(r.comment)}</span>
           <span class="lr-date">🕒 ${fmt(r.updatedAt || r.createdAt)}</span>`;
+      }
+
+      // 最新の未完了タスク（最近追加した未完了タスク = 未完了のうち先頭）
+      const ltBody = document.getElementById('latest-task-body');
+      const latestTask = tasks.find((t) => !t.done);
+      if (!latestTask) {
+        ltBody.innerHTML = '<span class="lt-empty">未完了のタスクはありません。</span>';
+      } else {
+        ltBody.innerHTML = `
+          <span class="lt-text" title="${esc(latestTask.text)}">${esc(latestTask.text)}</span>
+          <span class="lt-date">🕒 ${fmt(latestTask.createdAt)}</span>`;
       }
 
       // 振り返り一覧
