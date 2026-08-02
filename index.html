@@ -365,7 +365,9 @@
       if (tasks.length === 0) {
         tl.innerHTML = '<li class="empty">タスクはまだありません。</li>';
       } else {
-        tl.innerHTML = tasks.map((t) => `
+        // 未完了を上、完了を下に（同じ状態内では元の順=新しい順を維持）
+        const sortedTasks = [...tasks].sort((a, b) => (a.done === b.done ? 0 : a.done ? 1 : -1));
+        tl.innerHTML = sortedTasks.map((t) => `
           <li class="task-item ${t.done ? 'done' : ''}">
             <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)">
             <div class="t-main">
